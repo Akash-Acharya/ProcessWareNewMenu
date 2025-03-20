@@ -18,9 +18,11 @@ block-level on error undo, throw.
 
 class MainMenu inherits Form: 
     
+    define private variable AssistantPictureBox                    as System.Windows.Forms.PictureBox        no-undo.
     define private variable BTNNotification                        as System.Windows.Forms.Button            no-undo.
     define private variable BTNFavorite                            as System.Windows.Forms.Button            no-undo.
     define private variable BTNTODO                                as System.Windows.Forms.Button            no-undo.
+    define private variable button1                                as System.Windows.Forms.Button            no-undo.
     define private variable button3                                as System.Windows.Forms.Button            no-undo.
     define private variable components                             as System.ComponentModel.IContainer       no-undo.
     define private variable FavIcon                                as System.Windows.Forms.Panel             no-undo.
@@ -105,16 +107,25 @@ class MainMenu inherits Form:
     
     define private variable FavSubButton                as System.Windows.Forms.Button no-undo. 
     define private variable CheckOpenScreenFavSubButton as System.Windows.Forms.Button no-undo. 
-    define         variable FavBTNColumn                as integer                     initial 0 no-undo.
-    define         variable FavBTNRow                   as integer                     initial 0 no-undo.
+    define private variable FavBTNColumn                as integer                     initial 0 no-undo.
+    define private variable FavBTNRow                   as integer                     initial 0 no-undo.
     
     define private variable NotSubButton                as System.Windows.Forms.Button no-undo. 
-    define         variable NotBTNColumn                as integer                     initial 0 no-undo.
-    define         variable NotBTNRow                   as integer                     initial 0 no-undo.
+    define private variable NotBTNColumn                as integer                     initial 0 no-undo.
+    define private variable NotBTNRow                   as integer                     initial 0 no-undo.
     
     define private variable LocalPinSelected            as logical                     initial no no-undo.
     
+    define private variable NotificationState           as logical                     initial no no-undo.
+    
     //End Of Side Menu Bar
+    
+    //ChatBot
+    define private variable localchatbot as class MainMenu.ChatBot no-undo.
+    define private variable ChatBotPanel as class System.Windows.Forms.Panel. 
+    define private variable localtab as System.Windows.Forms.TabPage no-undo.
+    //End of ChatBot
+    
     
     //Temp Table for Open Screen
     
@@ -172,6 +183,40 @@ class MainMenu inherits Form:
 
     end constructor.
 
+/*------------------------------------------------------------------------------
+     Purpose:Chat Bot
+     Notes:
+    ------------------------------------------------------------------------------*/
+    @VisualDesigner.
+    method private void Assistant_Click( input sender as System.Object, input e as System.EventArgs ):
+        localchatbot = new MainMenu.ChatBot().
+        localchatbot:TopLevel = false.
+        localchatbot:Dock = DockStyle:fill.
+        
+        CreateTab("ChatBot").
+        
+        this-object:localtab:Controls:Add(this-object:localchatbot).
+        localchatbot:Show().
+        return.
+
+    end method.
+
+	method private void CreateTab(input tabname as character):     // Create a tab
+	    localtab = new System.Windows.Forms.TabPage().
+	    this-object:localtab:Location = new System.Drawing.Point(4, 22).
+        this-object:localtab:Name = tabname.
+        this-object:localtab:Padding = new System.Windows.Forms.Padding(3).
+        this-object:localtab:Size = new System.Drawing.Size(697, 417).
+        this-object:localtab:TabIndex = 10.
+        this-object:localtab:Text = tabname.
+        this-object:localtab:UseVisualStyleBackColor = true.
+        this-object:tabControl1:Controls:Add(this-object:localtab).
+        this-object:tabControl1:SelectedTab = this-object:localtab.
+       
+	end method.
+	
+	/* ------------------------------------------- End Of Chat Bot --------------------------- */
+
     /*------------------------------------------------------------------------------ -----------------------------------------------------
      Purpose: Call Super Procedures
      Notes:
@@ -197,6 +242,8 @@ class MainMenu inherits Form:
         this-object:WindowState = System.Windows.Forms.FormWindowState:Maximized.
         
         FavoritePanelCustomizeDesing(). //Side Menu Bar Operation
+        CustomizeColourMode().          //UI Colour Set and Changes
+        
         return.
 
     end method.
@@ -220,7 +267,7 @@ class MainMenu inherits Form:
             //if UserProfile.Pin then
             if yes then                // This requirment for only this version (disable Pin Proporty)
             do:
-                this-object:menubar:width = this-object:menubar:MaximumSize:Width.     // If User Select As Pin Then Its Make By Defults as Pin For Next Time Login
+                this-object:menubar:width = this-object:menubar:MaximumSize:Width.       // If User Select As Pin Then Its Make By Defults as Pin For Next Time Login
                 //this-object:MenuBarPictureBox:Image = imageList:Images[2].             // Change The Icon Of OpenMenu/CloseMenu In MenuBarPictureBox 
                 this-object:FavSubMenupanel:Visible = false.
                 this-object:NotSubMenupanel:Visible = false.
@@ -228,7 +275,7 @@ class MainMenu inherits Form:
                 createInsideNotificationTabProc().
                 
                 /* **************************************************************** */
-                this-object:FavSubMenupanel:Visible = true.                             // This requirment for only this version ( Fav Sab Menu Alway open when User initially login )
+                this-object:FavSubMenupanel:Visible = true.                              // This requirment for only this version (Fav Sab Menu Alway open when User initially login)
             /* **************************************************************** */
                 
             end.
@@ -268,7 +315,7 @@ class MainMenu inherits Form:
             find first MenuItem where 
                 MenuItem.ModuleID = Folder.ModuleID and
                 MenuItem.FolderNo = Folder.FolderNo and
-                MenuItem.MenuItemNo = UserProfileMenuFavourites.MenuItemNo
+                MenuItem.MenuItemNo = processware.UserProfileMenuFavourites.MenuItemNo 
                 no-lock no-error.
                     
             if available MenuItem then
@@ -302,7 +349,6 @@ class MainMenu inherits Form:
         this-object:FavSubButton:TextAlign = System.Drawing.ContentAlignment:MiddleLeft.
         this-object:FavSubButton:UseCompatibleTextRendering = true.
         this-object:FavSubButton:UseVisualStyleBackColor = true. 
-       
         
         this-object:FavSubMenupanel:Controls:Add(this-object:FavSubButton). //Add Newly Created Botton into Favorite Drop Down Panel List
         
@@ -325,10 +371,15 @@ class MainMenu inherits Form:
     /*-------------- Purpose: Process For Creation All Sub Dynamic Notification Button Under Notification Button --------------*/
     
     @VisualDesigner.
-    method private void TimerReloadNotificatonProc( input sender as System.Object, input e as System.EventArgs ):
-        createInsideNotificationTabProc().
+    method private void TimerReloadNotificatonProc( input sender as System.Object, input e as System.EventArgs ): // Notification Panel Automatic Reload every Time Interval
+    
+        this-object:NotSubMenupanel:Visible = false.                //1st Its hide the notification panel
+        this-object:NotSubMenupanel:Controls:Clear().               //clear all the button appear inside notification panel
+        createInsideNotificationTabProc().                          //build all the notification button inside nitification panel
+        this-object:NotSubMenupanel:Visible = NotificationState.    //diplay/hide the notification panel if priviously user display/hide
+        
         return.
-
+    
     end method.
      
     @VisualDesigner.
@@ -348,8 +399,8 @@ class MainMenu inherits Form:
             do:
                 assign 
                     LocalNotificationCounter = LocalNotificationCounter + 1.
-                define variable NotForm as class NotificationToast no-undo.
-                NotForm = new NotificationToast(UserNotification.NotificationDetails, LocalNotificationCounter).
+                define variable NotForm as class Akash.NotificationToast no-undo.
+                NotForm = new Akash.NotificationToast(UserNotification.NotificationDetails, LocalNotificationCounter).
                 NotForm:show().
                 //wait-for System.Windows.Forms.Application:Run(NotForm).
                 //NotForm:Close().
@@ -463,10 +514,14 @@ class MainMenu inherits Form:
         do:
             HideSubMenu().
             this-object:NotSubMenupanel:Visible = true.
+            assign 
+                NotificationState = true.
         end.
         else
         do:
             this-object:NotSubMenupanel:Visible = false.
+            assign 
+                NotificationState = false.
         end. 
         
         return.
@@ -578,14 +633,20 @@ class MainMenu inherits Form:
         end.
     end method.
     
+    /*-------------- Purpose: Process For UI Color Changes --------------*/
+    
+    method private void CustomizeColourMode():
+    end method.
     
 
     /*------------------------------------------------------------------------------ -----------------------------------------------------
-     Purpose: Create Top Menu Strip
+     Purpose: Create Top Menu Strip And Functionality Open Screen Into Tab Format
      Notes: 
     ------------------------------------------------------------------------------ -----------------------------------------------------*/
     
-    method private void buildmainmenu(input inlocalmenuname as character): // Add Main Menu 
+    /*-------------- Purpose: Process For Add Main Menu (1st Layer Menu) --------------*/
+    
+    method private void buildmainmenu(input inlocalmenuname as character): // Add Main Menu (1st Menu Bar)
         
         define variable arrayvar1 as System.Windows.Forms.ToolStripItem no-undo.
         this-object:CreateMainMenuToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem().
@@ -603,7 +664,9 @@ class MainMenu inherits Form:
         this-object:PerformLayout().
     end method.
     
-    method private void buildsubmenu(input inSubMenuName as character): // Add Sub Menu 
+    /*-------------- Purpose: Process For Add Sub Menu Under Main Menu (2nd Layer Menu) --------------*/
+    
+    method private void buildsubmenu(input inSubMenuName as character): // Add Sub Menu (2nd Sub Menu)  
         this-object:CreateSubMenuMenuToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem().
         
         define variable arrayvar2 as System.Windows.Forms.ToolStripItem no-undo.
@@ -622,7 +685,9 @@ class MainMenu inherits Form:
         this-object:PerformLayout().
     end method.
     
-    method private void buildsubmenulistitem(input inlocalmenuname as character , input inProgrammName as character): // Add Sub Menu Item
+    /*-------------- Purpose: Process For Add Sub-Sub Menu Under Sub Menu (3nd Layer Menu) --------------*/
+    
+    method private void buildsubmenulistitem(input inlocalmenuname as character , input inProgrammName as character): // Add Sub Menu Item (3rd Sub Menu)
         this-object:CreateSubMenuListMenuToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem().
         define variable arrayvar3 as System.Windows.Forms.ToolStripItem no-undo.
         arrayvar3 = this-object:CreateSubMenuListMenuToolStripMenuItem.
@@ -632,13 +697,15 @@ class MainMenu inherits Form:
         this-object:CreateSubMenuListMenuToolStripMenuItem:Size = new System.Drawing.Size(152, 22).
         this-object:CreateSubMenuListMenuToolStripMenuItem:tag = inProgrammName.
         this-object:CreateSubMenuListMenuToolStripMenuItem:Text = inlocalmenuname.
-        this-object:CreateSubMenuListMenuToolStripMenuItem:Click:Subscribe(this-object:CallSubMenuListItem).
+        this-object:CreateSubMenuListMenuToolStripMenuItem:Click:Subscribe(this-object:CallSubMenuListItem). // Trigger Final Menu(3rd Menu) Method
         
         this-object:menuStrip1:ResumeLayout(false).
         this-object:menuStrip1:PerformLayout().
         this-object:ResumeLayout(false).
         this-object:PerformLayout().
     end method. 
+    
+    /*-------------- Purpose: Process For Open New Screen And Duplicate Screen --------------*/
     
     method private void CallSubMenuListItem(input sender as System.Object, input e as System.EventArgs):
         //Click response of menu item
@@ -655,7 +722,7 @@ class MainMenu inherits Form:
         
         this-object:intab = new System.Windows.Forms.TabPage().                  //incompliet
         
-        find first OpenScreen where
+        find first OpenScreen where                     // Duplicate Open Screen not Applicable
             OpenScreen.TabName = MenuListItemName and
             OpenScreen.TabProgramName = MenuListItemTag
             no-lock no-error.
@@ -673,7 +740,7 @@ class MainMenu inherits Form:
         do: 
             
             tabPagemakeSelect = no.
-            this-object:buildTabContainer(MenuListItemName,MenuListItemTag).    
+            this-object:buildTabContainer(MenuListItemName,MenuListItemTag).
         end.
         
         return.
@@ -682,6 +749,8 @@ class MainMenu inherits Form:
     method private void selectedTab():
         //this-object:tabControl1:SelectedTab
     end method.
+    
+    /*-------------- Purpose: Process For Open Window File(.W) Inside Container --------------*/
     
     method private void buildTabContainer(input inTabName as character, input inProgrammName as character): //Create a new tab,Close Button for all screen,New Container for all tab page,Window File(.W) persistent with Container
         if tabPagemakeSelect then
@@ -734,6 +803,8 @@ class MainMenu inherits Form:
         //End of Container
 
         //Call W file Inside Container
+        message inProgrammName
+        view-as alert-box info buttons ok.
             run value(inProgrammName) persistent set Containerhandle.
             ContainerWin = Containerhandle:current-window.
             WinContainer:EmbeddedWindow = ContainerWin.
@@ -751,8 +822,7 @@ class MainMenu inherits Form:
             release OpenScreen. 
         
         end.
-        
-            
+          
         this-object:tabControl1:ResumeLayout(false).
         this-object:tabPage:ResumeLayout(false).
         this-object:ResumeLayout(false).
@@ -777,6 +847,7 @@ class MainMenu inherits Form:
 
     end method.
     
+    /*-------------- Purpose: Load Json Data Into Temp Table --------------*/
     
     method private void ProcessJsonData ():
         create dataset hDSet.
@@ -826,10 +897,12 @@ class MainMenu inherits Form:
         this-object:exitToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem().
         this-object:tabControl1 = new System.Windows.Forms.TabControl().
         this-object:tabPage1 = new System.Windows.Forms.TabPage().
+        this-object:button1 = new System.Windows.Forms.Button().
         this-object:button3 = new System.Windows.Forms.Button().
         this-object:windowContainer = new Progress.Windows.WindowContainer().
         this-object:imageList = new System.Windows.Forms.ImageList(this-object:components).
         this-object:MenuBar = new System.Windows.Forms.Panel().
+        this-object:AssistantPictureBox = new System.Windows.Forms.PictureBox().
         this-object:TODOPanel = new System.Windows.Forms.Panel().
         this-object:BTNTODO = new System.Windows.Forms.Button().
         this-object:NotSubMenupanel = new System.Windows.Forms.FlowLayoutPanel().
@@ -847,6 +920,7 @@ class MainMenu inherits Form:
         this-object:tabControl1:SuspendLayout().
         this-object:tabPage1:SuspendLayout().
         this-object:MenuBar:SuspendLayout().
+        cast(this-object:AssistantPictureBox, System.ComponentModel.ISupportInitialize):BeginInit().
         this-object:TODOPanel:SuspendLayout().
         this-object:NotificationPanel:SuspendLayout().
         this-object:FavoritePanel:SuspendLayout().
@@ -901,6 +975,7 @@ class MainMenu inherits Form:
         /*  */
         /* tabPage1 */
         /*  */
+        this-object:tabPage1:Controls:Add(this-object:button1).
         this-object:tabPage1:Controls:Add(this-object:button3).
         this-object:tabPage1:Controls:Add(this-object:windowContainer).
         this-object:tabPage1:Location = new System.Drawing.Point(4, 22).
@@ -911,26 +986,40 @@ class MainMenu inherits Form:
         this-object:tabPage1:Text = "Dashboard".
         this-object:tabPage1:UseVisualStyleBackColor = true.
         /*  */
+        /* button1 */
+        /*  */
+        define variable nestedvar1 as System.Windows.Forms.AnchorStyles no-undo.
+        nestedvar1 = System.Windows.Forms.AnchorStyles:Bottom.
+        this-object:button1:Anchor = cast(Progress.Util.EnumHelper:Or(nestedvar1, System.Windows.Forms.AnchorStyles:Right), System.Windows.Forms.AnchorStyles).
+        this-object:button1:Location = new System.Drawing.Point(714, 368).
+        this-object:button1:Name = "button1".
+        this-object:button1:Size = new System.Drawing.Size(107, 29).
+        this-object:button1:TabIndex = 7.
+        this-object:button1:Text = "Not 3 Akash jjjjjjjjj".
+        this-object:button1:UseCompatibleTextRendering = true.
+        this-object:button1:UseVisualStyleBackColor = true.
+        /*  */
         /* button3 */
         /*  */
         this-object:button3:FlatAppearance:BorderSize = 0.
         this-object:button3:FlatStyle = System.Windows.Forms.FlatStyle:Flat.
         this-object:button3:ForeColor = System.Drawing.Color:Gainsboro.
-        this-object:button3:Location = new System.Drawing.Point(673, 370).
+        this-object:button3:Location = new System.Drawing.Point(346, 243).
         this-object:button3:Name = "button3".
         this-object:button3:Padding = new System.Windows.Forms.Padding(30, 0, 0, 0).
-        this-object:button3:Size = new System.Drawing.Size(160, 23).
+        this-object:button3:Size = new System.Drawing.Size(130, 39).
         this-object:button3:TabIndex = 6.
-        this-object:button3:Text = "Not 3".
+        this-object:button3:Text = "Not 3 Akash jjjjjjjjj".
         this-object:button3:TextAlign = System.Drawing.ContentAlignment:MiddleLeft.
+        this-object:button3:TextImageRelation = System.Windows.Forms.TextImageRelation:TextBeforeImage.
         this-object:button3:UseCompatibleTextRendering = true.
         this-object:button3:UseVisualStyleBackColor = true.
         /*  */
         /* windowContainer */
         /*  */
-        define variable nestedvar1 as System.Windows.Forms.AnchorStyles no-undo.
-        nestedvar1 = cast(Progress.Util.EnumHelper:Or(cast(Progress.Util.EnumHelper:Or(System.Windows.Forms.AnchorStyles:Top, System.Windows.Forms.AnchorStyles:Bottom), System.Windows.Forms.AnchorStyles), System.Windows.Forms.AnchorStyles:Left), System.Windows.Forms.AnchorStyles).
-        this-object:windowContainer:Anchor = cast(Progress.Util.EnumHelper:Or(nestedvar1, System.Windows.Forms.AnchorStyles:Right), System.Windows.Forms.AnchorStyles).
+        define variable nestedvar2 as System.Windows.Forms.AnchorStyles no-undo.
+        nestedvar2 = cast(Progress.Util.EnumHelper:Or(cast(Progress.Util.EnumHelper:Or(System.Windows.Forms.AnchorStyles:Top, System.Windows.Forms.AnchorStyles:Bottom), System.Windows.Forms.AnchorStyles), System.Windows.Forms.AnchorStyles:Left), System.Windows.Forms.AnchorStyles).
+        this-object:windowContainer:Anchor = cast(Progress.Util.EnumHelper:Or(nestedvar2, System.Windows.Forms.AnchorStyles:Right), System.Windows.Forms.AnchorStyles).
         this-object:windowContainer:AutoSizeMode = System.Windows.Forms.AutoSizeMode:GrowAndShrink.
         this-object:windowContainer:BackColor = System.Drawing.Color:WhiteSmoke.
         this-object:windowContainer:Location = new System.Drawing.Point(2, 3).
@@ -947,15 +1036,17 @@ class MainMenu inherits Form:
         this-object:imageList:Images:SetKeyName(2, "MenuOpen.png").
         this-object:imageList:Images:SetKeyName(3, "Pin.png").
         this-object:imageList:Images:SetKeyName(4, "Unpin.png").
+        this-object:imageList:Images:SetKeyName(5, "robotic.gif").
         /*  */
         /* MenuBar */
         /*  */
-        define variable nestedvar2 as System.Windows.Forms.AnchorStyles no-undo.
-        nestedvar2 = cast(Progress.Util.EnumHelper:Or(System.Windows.Forms.AnchorStyles:Top, System.Windows.Forms.AnchorStyles:Bottom), System.Windows.Forms.AnchorStyles).
-        this-object:MenuBar:Anchor = cast(Progress.Util.EnumHelper:Or(nestedvar2, System.Windows.Forms.AnchorStyles:Left), System.Windows.Forms.AnchorStyles).
+        define variable nestedvar3 as System.Windows.Forms.AnchorStyles no-undo.
+        nestedvar3 = cast(Progress.Util.EnumHelper:Or(System.Windows.Forms.AnchorStyles:Top, System.Windows.Forms.AnchorStyles:Bottom), System.Windows.Forms.AnchorStyles).
+        this-object:MenuBar:Anchor = cast(Progress.Util.EnumHelper:Or(nestedvar3, System.Windows.Forms.AnchorStyles:Left), System.Windows.Forms.AnchorStyles).
         this-object:MenuBar:AutoScroll = true.
         this-object:MenuBar:AutoSizeMode = System.Windows.Forms.AutoSizeMode:GrowAndShrink.
         this-object:MenuBar:BackColor = System.Drawing.Color:FromArgb(System.Convert:ToInt32(System.Convert:ToByte(15)), System.Convert:ToInt32(System.Convert:ToByte(20)), System.Convert:ToInt32(System.Convert:ToByte(18))).
+        this-object:MenuBar:Controls:Add(this-object:AssistantPictureBox).
         this-object:MenuBar:Controls:Add(this-object:TODOPanel).
         this-object:MenuBar:Controls:Add(this-object:NotSubMenupanel).
         this-object:MenuBar:Controls:Add(this-object:NotificationPanel).
@@ -968,6 +1059,20 @@ class MainMenu inherits Form:
         this-object:MenuBar:Name = "MenuBar".
         this-object:MenuBar:Size = new System.Drawing.Size(185, 432).
         this-object:MenuBar:TabIndex = 3.
+        /*  */
+        /* AssistantPictureBox */
+        /*  */
+        define variable nestedvar4 as System.Windows.Forms.AnchorStyles no-undo.
+        nestedvar4 = System.Windows.Forms.AnchorStyles:Bottom.
+        this-object:AssistantPictureBox:Anchor = cast(Progress.Util.EnumHelper:Or(nestedvar4, System.Windows.Forms.AnchorStyles:Left), System.Windows.Forms.AnchorStyles).
+        this-object:AssistantPictureBox:Image = cast(resources:GetObject("AssistantPictureBox.Image"), System.Drawing.Image).
+        this-object:AssistantPictureBox:Location = new System.Drawing.Point(5, 290).
+        this-object:AssistantPictureBox:Name = "AssistantPictureBox".
+        this-object:AssistantPictureBox:Size = new System.Drawing.Size(78, 77).
+        this-object:AssistantPictureBox:SizeMode = System.Windows.Forms.PictureBoxSizeMode:StretchImage.
+        this-object:AssistantPictureBox:TabIndex = 5.
+        this-object:AssistantPictureBox:TabStop = false.
+        this-object:AssistantPictureBox:Click:Subscribe(this-object:Assistant_Click).
         /*  */
         /* TODOPanel */
         /*  */
@@ -1113,6 +1218,7 @@ class MainMenu inherits Form:
         /* MainMenu */
         /*  */
         this-object:AccessibleName = "".
+        this-object:AutoSize = true.
         this-object:AutoSizeMode = System.Windows.Forms.AutoSizeMode:GrowAndShrink.
         this-object:BackColor = System.Drawing.Color:FromArgb(System.Convert:ToInt32(System.Convert:ToByte(246)), System.Convert:ToInt32(System.Convert:ToByte(246)), System.Convert:ToInt32(System.Convert:ToByte(244))).
         this-object:ClientSize = new System.Drawing.Size(1022, 493).
@@ -1128,6 +1234,7 @@ class MainMenu inherits Form:
         this-object:tabControl1:ResumeLayout(false).
         this-object:tabPage1:ResumeLayout(false).
         this-object:MenuBar:ResumeLayout(false).
+        cast(this-object:AssistantPictureBox, System.ComponentModel.ISupportInitialize):EndInit().
         this-object:TODOPanel:ResumeLayout(false).
         this-object:NotificationPanel:ResumeLayout(false).
         this-object:FavoritePanel:ResumeLayout(false).
